@@ -2,12 +2,13 @@
 
 import { useEffect, useRef, useCallback } from 'react'
 import { useAuth } from '@/hooks/use-auth'
+import { shouldTrackCustomSession } from '@/lib/performance-policy'
 
 /**
  * SessionTracker Component
  * 
  * Automatically tracks user sessions with device, browser, and OS information
- * Updates session activity every 5 minutes
+ * Tracks signed-in users only; anonymous traffic is already covered by GA.
  */
 
 // Helper to detect device type
@@ -160,6 +161,11 @@ export function SessionTracker() {
     
     // Update previous user ID
     previousUserIdRef.current = user?.id || null
+
+    // Anonymous session writes were the largest source of avoidable function work.
+    // Also respect the browser's explicit privacy preference.
+    const doNotTrack = navigator.doNotTrack === '1'
+    if (!shouldTrackCustomSession(user?.id, doNotTrack)) return
     
     // Only track once per page load (or after user change)
     if (hasTrackedRef.current) return
@@ -194,14 +200,15 @@ export function SessionTracker() {
         currentSessionIdRef.current = sessionId
         hasTrackedRef.current = true
 
-        // Update session activity every 5 minutes
+        // A 30-minute heartbeat is enough to distinguish genuinely long sessions.
         activityIntervalRef.current = setInterval(async () => {
+          if (document.visibilityState !== 'visible') return
           await fetch('/api/analytics/session', {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ session_id: sessionId })
           })
-        }, 5 * 60 * 1000) // 5 minutes
+        }, 30 * 60 * 1000)
       } catch (error) {
         console.error('Failed to track session:', error)
       }

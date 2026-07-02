@@ -18,12 +18,10 @@ import { NextRequest } from 'next/server'
 import { z } from 'zod'
 import { createClient } from '@supabase/supabase-js'
 import { withMiddleware, withValidation, withErrorHandler, createSuccessResponse } from '@/lib/middleware'
+import { PUBLIC_CATALOG_CACHE_CONTROL } from '@/lib/performance-policy'
 
 // Run on Node.js runtime for access to secure environment variables
 export const runtime = 'nodejs'
-// Force dynamic rendering and disable caching
-export const dynamic = 'force-dynamic'
-export const revalidate = 0
 
 /**
  * Initialize Supabase client with service role for server-side operations
@@ -196,7 +194,7 @@ async function getProductsQuery(params: z.infer<typeof getProductsSchema>) {
     }
     
     console.log(`[Products API] Fetched ${allProducts.length} total products in batches`)
-    return allProducts
+    return { products: allProducts, totalCount: total }
   }
   
   // Normal pagination - single fetch
@@ -205,7 +203,7 @@ async function getProductsQuery(params: z.infer<typeof getProductsSchema>) {
   // Throw any errors for proper error handling middleware
   if (error) throw error
   
-  return data // Return successfully fetched products
+  return { products: data || [], totalCount: total }
 }
 
 /**
@@ -256,25 +254,9 @@ export const GET = withMiddleware(
   })
   
   // Fetch products (handles batching internally if needed)
-  const products = await getProductsQuery(validatedData)
-  
-  // Get total count separately for accurate pagination metadata
-  let countQuery = supabase
-    .from('products')
-    .select('*', { count: 'exact', head: true })
-    .eq('is_active', true)
-  
-  if (validatedData.category) {
-    countQuery = countQuery.eq('category_id', validatedData.category)
-  }
-  if (validatedData.featured) {
-    countQuery = countQuery.eq('is_featured', true)
-  }
-  
-  const { count: total } = await countQuery
-  
+  const { products, totalCount } = await getProductsQuery(validatedData)
+
   // Calculate pagination metadata
-  const totalCount = total || 0
   const returnedCount = products.length
   const hasMore = (validatedData.offset + returnedCount) < totalCount
   
@@ -297,7 +279,7 @@ export const GET = withMiddleware(
   // No cache for full product data (single product detail views need fresh data)
   if (validatedData.minimal) {
     // Cache minimal data for 60 seconds for fast shop page loads
-    response.headers.set('Cache-Control', 'public, s-maxage=60, stale-while-revalidate=120')
+    response.headers.set('Cache-Control', PUBLIC_CATALOG_CACHE_CONTROL)
   } else {
     // No caching for full product data (admin, single views, etc.)
     response.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate')

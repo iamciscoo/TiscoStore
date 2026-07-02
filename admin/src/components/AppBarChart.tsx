@@ -1,7 +1,8 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ChartContainer, ChartLegend, ChartLegendContent, ChartTooltip, ChartTooltipContent, type ChartConfig } from "@/components/ui/chart";
 import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from "recharts";
+import { shouldRefreshRevenue } from "@/lib/revenue-refresh";
 
 type RevenuePoint = { month: string; total: number; successful: number };
 
@@ -25,37 +26,34 @@ async function fetchRevenue(): Promise<RevenuePoint[]> {
 
 const AppBarChart = () => {
   const [chartData, setChartData] = useState<RevenuePoint[]>([]);
+  const lastFetchedAt = useRef(0);
+
+  const load = useCallback(async () => {
+    const data = await fetchRevenue();
+    lastFetchedAt.current = Date.now();
+    setChartData(data);
+  }, []);
 
   useEffect(() => {
-    let es: EventSource | null = null;
-    let aborted = false;
+    void load();
 
-    const load = async () => {
-      const data = await fetchRevenue();
-      if (!aborted) setChartData(data);
+    const refreshWhenActive = () => {
+      if (
+        document.visibilityState === 'visible' &&
+        shouldRefreshRevenue(lastFetchedAt.current, Date.now())
+      ) {
+        void load();
+      }
     };
-    load();
 
-    try {
-      es = new EventSource("/api/dashboard/revenue/stream");
-      es.onmessage = (e) => {
-        try {
-          const msg = JSON.parse(e.data);
-          if (msg?.type === "orders_change") {
-            load();
-          }
-        } catch {}
-      };
-      es.onerror = () => {
-        es?.close();
-      };
-    } catch {}
+    window.addEventListener('focus', refreshWhenActive);
+    document.addEventListener('visibilitychange', refreshWhenActive);
 
     return () => {
-      aborted = true;
-      if (es) es.close();
+      window.removeEventListener('focus', refreshWhenActive);
+      document.removeEventListener('visibilitychange', refreshWhenActive);
     };
-  }, []);
+  }, [load]);
 
   return (
     <div className="">

@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { withMiddleware, withErrorHandler, createSuccessResponse } from '@/lib/middleware'
+import { PUBLIC_CATALOG_CACHE_CONTROL } from '@/lib/performance-policy'
 
 export const runtime = 'nodejs'
 
@@ -40,11 +41,7 @@ export const GET = withMiddleware(
 
   const response = Response.json(createSuccessResponse(brands))
   
-  // Set no-cache headers to ensure fresh data
-  response.headers.set('Cache-Control', 'no-cache, no-store, must-revalidate')
-  response.headers.set('CDN-Cache-Control', 'no-cache')
-  response.headers.set('Pragma', 'no-cache')
-  response.headers.set('Expires', '0')
+  response.headers.set('Cache-Control', PUBLIC_CATALOG_CACHE_CONTROL)
   
   return response
 })

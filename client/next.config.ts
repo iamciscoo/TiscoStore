@@ -75,6 +75,17 @@ const nextConfig: NextConfig = {
   async redirects() {
     return [
       {
+        source: '/:path*',
+        has: [
+          {
+            type: 'host',
+            value: 'www.tiscomarket.store',
+          },
+        ],
+        destination: 'https://tiscomarket.store/:path*',
+        permanent: true,
+      },
+      {
         source: '/sign-in/:path*',
         destination: '/auth/sign-in',
         permanent: true,
@@ -177,49 +188,9 @@ const nextConfig: NextConfig = {
           }
         ],
       },
-      // **CACHING DISABLED FOR REAL-TIME UPDATES**
-      // Products and categories must always be fresh for instant admin sync
-      {
-        source: '/api/products/(.*)',
-        headers: [
-          {
-            key: 'Cache-Control',
-            value: 'no-cache, no-store, must-revalidate',
-          },
-          {
-            key: 'CDN-Cache-Control',
-            value: 'no-cache',
-          },
-          {
-            key: 'X-Content-Type-Options',
-            value: 'nosniff'
-          }
-        ],
-      },
-      {
-        source: '/api/categories/(.*)',
-        headers: [
-          {
-            key: 'Cache-Control',
-            value: 'no-cache, no-store, must-revalidate',
-          },
-          {
-            key: 'CDN-Cache-Control',
-            value: 'no-cache',
-          },
-          {
-            key: 'X-Content-Type-Options',
-            value: 'nosniff'
-          }
-        ],
-      },
       {
         source: '/api/(.*)',
         headers: [
-          {
-            key: 'Cache-Control',
-            value: 'no-cache, no-store, must-revalidate',
-          },
           {
             key: 'X-Content-Type-Options',
             value: 'nosniff'

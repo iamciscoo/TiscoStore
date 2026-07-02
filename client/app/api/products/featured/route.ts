@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { createClient } from '@supabase/supabase-js'
 import { withMiddleware, withValidation, withErrorHandler, createSuccessResponse } from '@/lib/middleware'
 import { PAGINATION_LIMITS, applyListOptimizations } from '@/lib/optimized-queries'
+import { PUBLIC_CATALOG_CACHE_CONTROL } from '@/lib/performance-policy'
 
 export const runtime = 'nodejs'
 
@@ -73,9 +74,8 @@ export const GET = withMiddleware(
     return data || []
   }
 
-  // **CACHING DISABLED FOR REAL-TIME UPDATES**
-  // Always fetch fresh data for instant admin updates
-  console.log('🔄 Fetching fresh featured products (caching disabled for real-time updates)')
+  // This executes only on a CDN miss; the response policy serves repeat traffic.
+  console.log('🔄 Fetching featured products from the database')
   const allFeaturedProducts = await getFeaturedProductsQuery()
   
   // **SPARSE POSITIONING LOGIC**
@@ -117,11 +117,7 @@ export const GET = withMiddleware(
 
   const response = Response.json(createSuccessResponse(data))
   
-  // Set no-cache headers to ensure fresh data always
-  response.headers.set('Cache-Control', 'no-cache, no-store, must-revalidate')
-  response.headers.set('CDN-Cache-Control', 'no-cache')
-  response.headers.set('Pragma', 'no-cache')
-  response.headers.set('Expires', '0')
+  response.headers.set('Cache-Control', PUBLIC_CATALOG_CACHE_CONTROL)
   response.headers.set('Vary', 'Accept-Encoding')
   
   return response

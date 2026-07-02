@@ -7,7 +7,6 @@ import { useEffect, useState } from "react";
 
 export const FeaturedProducts = () => {
   const [products, setProducts] = useState<(Product | null)[]>([]);
-  const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {
     let isMounted = true;
@@ -43,16 +42,6 @@ export const FeaturedProducts = () => {
     return () => {
       isMounted = false;
     };
-  }, [refreshKey]);
-
-  // Refresh products when window gains focus (user returns to tab)
-  useEffect(() => {
-    const handleFocus = () => {
-      setRefreshKey(prev => prev + 1);
-    };
-    
-    window.addEventListener('focus', handleFocus);
-    return () => window.removeEventListener('focus', handleFocus);
   }, []);
   
   // Derived lists for layouts (preserve ordering, hide nulls in UI)
